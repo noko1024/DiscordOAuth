@@ -31,7 +31,7 @@ def OAuth():
         'client_secret': "u6Vrf2Lem8tyS5XLS8_DEdYv1pZweTMb",
         'grant_type': 'authorization_code',
         'code': code,
-        'redirect_uri': "https://api.noko1024.net",
+        'redirect_uri': "https://api.noko1024.net\OAuth",
         'scope': 'identify guilds'
     }
     headers_token = {
