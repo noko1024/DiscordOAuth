@@ -1,6 +1,8 @@
 import requests
-from flask import Flask, json,request,make_response,jsonify
+from flask import Flask, json,request,make_response,jsonify,redirect
 import os
+
+from requests.models import REDIRECT_STATI
 
 
 requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS += "HIGH:!DH:!aNULL"
@@ -10,8 +12,13 @@ basePath = os.path.dirname(__file__)
 
 
 
-#OAuth認証(ベアラートークン取得→)
-@app.route("/")
+@app.route("/want")
+def AuthWait():
+
+    return redirect("https://discord.com/api/oauth2/authorize?client_id=776864066370404363&redirect_uri=https%3A%2F%2Fapi.noko1024.net%2FOAuth&response_type=code&scope=identify%20guilds")
+
+#OAuth認証(ベアラートークン取得→アクセストークン取得→データ照会)
+@app.route("/OAuth")
 def OAuth():
     #リダイレクトでベアラートークンをもらう
     code = request.args.get('code', default = None, type = str)
