@@ -3,16 +3,12 @@ from flask import Flask, json,request,make_response,jsonify,redirect,render_temp
 #apacheパイセンがよしなになってくれそう
 #from flask_sslify import SSLify
 import os
-import sqlite3
 import qrcode
 import random
 import string
 import base64
 from io import BytesIO
 import socket
-
-from requests import status_codes
-
 #SSL関係はあぱっちパイセンに任せてるのでローカル環境ではcode 400 Bad Request
 
 #---config.json読み込み---
@@ -36,6 +32,14 @@ app = Flask(__name__)
 
 basePath = os.path.dirname(__file__)
 
+
+@app.errorhandler(404)
+def Notfound(error):
+    return render_template("418.html"),418
+
+@app.errorhandler(500)
+def InternalServerError(error):
+    return render_template("500.html"),500
 
 @app.route("/gen")
 def OneTimeURLGenerate():
@@ -78,7 +82,7 @@ def AuthWait():
     if recv == "True":
         return redirect(redirectURL)
     elif recv == "False":
-        return "404"
+        return render_template("404.html"),404
 
 #OAuth認証(ベアラートークン取得→アクセストークン取得→データ照会)
 @app.route("/OAuth")
@@ -87,7 +91,7 @@ def OAuth():
     code = request.args.get('code', default = None, type = str)
     
     if code is None:
-        return "NONE"
+        return render_template("404.html"),404
 
     data = {
         'client_id': ClientID,
@@ -103,7 +107,6 @@ def OAuth():
     
     #アクセストークンを取得(dict)
     userAccessToken = requests.post('https://discord.com/api/v8/oauth2/token', data=data, headers=headers_token).json()
-
     #ユーザーデータ取得用
     headers = {
         "Authorization": "Bearer %s" % userAccessToken["access_token"]
@@ -132,7 +135,7 @@ def OAuth():
 
     #プロ研に属していなかったら
     if not [x for x in userGuild if x["id"] == "565666930493489184"]:
-        return "NOTPROKEN"
+        return render_template("403.html"),403
 
     headers = {
         "Authorization": "Bot %s" % botToken
@@ -141,10 +144,9 @@ def OAuth():
     #削除成功しているか？
     status = requests.delete("https://discord.com/api/guilds/"+guildID+"/members/"+userInfo["id"]+"/roles/"+roleID,headers=headers).status_code
     if status == 204:
-        return "成功しました"
-    print(status)
-    return "失敗しました"
+        return render_template("200.html"),200
+    else:
+        return render_template("500.html"),500
 
 if __name__ == "__main__":
-	app.run(debug=True)
-#global変数の挙動が怪しい
+	app.run(debug=False)

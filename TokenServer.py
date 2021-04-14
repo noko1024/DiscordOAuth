@@ -21,6 +21,10 @@ while True:
             oneTimeURL.remove(recv.lstrip("AUTH-"))
         else:
             connection.send(bytes("False","utf-8"))
+    
+    elif recv.lstrip("DEL-") in oneTimeURL:
+        oneTimeURL.remove(recv.lstrip("DEL-"))
+        connection.send(bytes("True","utf-8"))
 
     print(oneTimeURL)
     connection.close()
