@@ -9,6 +9,7 @@ import random
 import string
 import base64
 from io import BytesIO
+import socket
 
 from requests import status_codes
 
@@ -26,9 +27,7 @@ ClientSecret = "JL5nbj6qCyO3j77R-eox7IHeXNly6msU"
 botToken = "Njc4Njk0MjA5MDU3OTgwNDY3.XkmhPA.hiCytsZowRx3sm59Al2AazYR4MM"
 guildID = "830565829895782440"
 roleID = "830566515392249857"
-redirectURL = "https://discord.com/api/oauth2/authorize?client_id=678694209057980467&redirect_uri=https%3A%2F%2Fapi.noko1024.net%2FOAuth&response_type=code&scope=identify%20guilds"
-
-oneTimeURL = []
+redirectURL = "https://discord.com/api/oauth2/authorize?client_id=678694209057980467&redirect_uri=http%3A%2F%2Flocalhost%3A5000%2FOAuth&response_type=code&scope=identify%20guilds"
 
 requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS += "HIGH:!DH:!aNULL"
 app = Flask(__name__)
@@ -37,14 +36,20 @@ app = Flask(__name__)
 
 basePath = os.path.dirname(__file__)
 
+
 @app.route("/gen")
 def OneTimeURLGenerate():
     global oneTimeURL
-    onetime = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
-    accessURL = "https://api.noko1024.net/want?param="+onetime
-    oneTimeURL.append(onetime)
-    img = qrcode.make(accessURL)
+    oneTime = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+    accessURL = "http://api.noko1024.net/want?param="+oneTime
 
+    soc = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+    soc.connect(("127.0.0.1",51994))
+    soc.send(bytes(("GEN-"+oneTime),'utf8'))
+    soc.close()
+        
+
+    img = qrcode.make(accessURL)
     # 画像書き込み用バッファを確保して画像データをそこに書き込む
     buf = BytesIO()
     img.save(buf,format="png")
@@ -52,8 +57,7 @@ def OneTimeURLGenerate():
     qr_b64str = base64.b64encode(buf.getvalue()).decode("utf-8")
     # image要素のsrc属性に埋め込めこむために、適切に付帯情報を付与する
     qr_b64data = "data:image/png;base64,{}".format(qr_b64str)
-    print("GEN-ONETIMEURL")
-    print(oneTimeURL)
+
     return render_template("QR.html",qr_b64data=qr_b64data)
 
 
@@ -63,15 +67,17 @@ def OneTimeURLGenerate():
 @app.route("/want")
 def AuthWait():
     global oneTimeURL
-    accessOpt = request.args.get('param', default = None, type = str)
-    print("Want-Access")
-    print(accessOpt)
-    print("Want-onetimeurl")
-    print(oneTimeURL)
-    if accessOpt in oneTimeURL:
-        oneTimeURL.remove(accessOpt)
+    oneTime = request.args.get('param', default = None, type = str)
+
+    soc = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+    soc.connect(("127.0.0.1",51994))
+    soc.send(bytes(("AUTH-"+oneTime),'utf8'))
+    recv = soc.recv(4096).decode()
+    soc.close()
+
+    if recv == "True":
         return redirect(redirectURL)
-    else:
+    elif recv == "False":
         return "404"
 
 #OAuth認証(ベアラートークン取得→アクセストークン取得→データ照会)
@@ -88,7 +94,7 @@ def OAuth():
         'client_secret': ClientSecret,
         'grant_type': 'authorization_code',
         'code': code,
-        'redirect_uri': "https://api.noko1024.net/OAuth",
+        'redirect_uri': "http://localhost:5000/OAuth",
         'scope': 'identify guilds'
     }
     headers_token = {
@@ -128,12 +134,17 @@ def OAuth():
     if not [x for x in userGuild if x["id"] == "565666930493489184"]:
         return "NOTPROKEN"
 
-    #HTTPS使えない説　削除成功しているか？
+    headers = {
+        "Authorization": "Bot %s" % botToken
+    }
+
+    #削除成功しているか？
     status = requests.delete("https://discord.com/api/guilds/"+guildID+"/members/"+userInfo["id"]+"/roles/"+roleID,headers=headers).status_code
     if status == 204:
-        return "成功しました。"
-
-    return status
+        return "成功しました"
+    print(status)
+    return "失敗しました"
 
 if __name__ == "__main__":
 	app.run(debug=True)
+#global変数の挙動が怪しい
