@@ -1,5 +1,5 @@
 import requests
-from flask import Flask, json,request,make_response,jsonify,redirect,render_template
+from flask import Flask, json,request,make_response,jsonify,redirect,render_template,session
 #apacheパイセンがよしなになってくれそう
 #from flask_sslify import SSLify
 import os
@@ -27,6 +27,7 @@ redirectURL = "https://discord.com/api/oauth2/authorize?client_id=67869420905798
 
 requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS += "HIGH:!DH:!aNULL"
 app = Flask(__name__)
+app.secret_key = os.urandom(24)
 
 #sslify = SSLify(app)
 
@@ -45,7 +46,7 @@ def InternalServerError(error):
 def OneTimeURLGenerate():
     global oneTimeURL
     oneTime = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
-    accessURL = "http://api.noko1024.net/want?param="+oneTime
+    accessURL = "http://localhost:5000/want?param="+oneTime
 
     soc = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
     soc.connect(("127.0.0.1",51994))
@@ -80,6 +81,7 @@ def AuthWait():
     soc.close()
 
     if recv == "True":
+        session["oneTime"] = oneTime
         return redirect(redirectURL)
     elif recv == "False":
         return render_template("404.html"),404
@@ -89,7 +91,10 @@ def AuthWait():
 def OAuth():
     #リダイレクトでベアラートークンをもらう
     code = request.args.get('code', default = None, type = str)
-    
+
+    #KeyError Bearerでエラー
+    oneTime = session["oneTime"]
+    print(oneTime)
     if code is None:
         return render_template("404.html"),404
 
@@ -144,7 +149,15 @@ def OAuth():
     #削除成功しているか？
     status = requests.delete("https://discord.com/api/guilds/"+guildID+"/members/"+userInfo["id"]+"/roles/"+roleID,headers=headers).status_code
     if status == 204:
-        return render_template("200.html"),200
+        soc = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+        soc.connect(("127.0.0.1",51994))
+        soc.send(bytes(("DEL-"+oneTime),'utf8'))
+        recv = soc.recv(4096).decode()
+        soc.close()
+        if recv == "True":
+            return render_template("200.html"),200
+        else:
+            return render_template("500.html"),500
     else:
         return render_template("500.html"),500
 
