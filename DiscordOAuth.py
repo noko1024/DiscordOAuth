@@ -1,3 +1,4 @@
+from flask.wrappers import Response
 import requests
 from flask import Flask, json,request,make_response,jsonify,redirect,render_template,session
 #apacheパイセンがよしなになってくれそう
@@ -9,6 +10,7 @@ import string
 import base64
 from io import BytesIO
 import socket
+import datetime
 #SSL関係はあぱっちパイセンに任せてるのでローカル環境ではcode 400 Bad Request
 
 #---config.json読み込み---
@@ -44,7 +46,14 @@ def InternalServerError(error):
 
 @app.route("/gen")
 def OneTimeURLGenerate():
-    global oneTimeURL
+    
+    #QRコード発行者の認証方法考案
+    #OAuthは書きたくない
+    adminToken = request.cookies.get("token")
+    if adminToken == None:
+        pass
+
+
     oneTime = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
     accessURL = "http://localhost:5000/want?param="+oneTime
 
@@ -66,12 +75,9 @@ def OneTimeURLGenerate():
     return render_template("QR.html",qr_b64data=qr_b64data)
 
 
-
-
-
 @app.route("/want")
 def AuthWait():
-    global oneTimeURL
+    session.permanent = True
     oneTime = request.args.get('param', default = None, type = str)
 
     soc = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
@@ -81,21 +87,33 @@ def AuthWait():
     soc.close()
 
     if recv == "True":
-        session["oneTime"] = oneTime
-        return redirect(redirectURL)
+        response = redirect(redirectURL)
+        max_age = 60 * 60 * 24 * 1 # 7 days
+        response.set_cookie('oneTime', value=oneTime,path="/",max_age=max_age, secure=False)
+        return response
+
     elif recv == "False":
         return render_template("404.html"),404
+
 
 #OAuth認証(ベアラートークン取得→アクセストークン取得→データ照会)
 @app.route("/OAuth")
 def OAuth():
     #リダイレクトでベアラートークンをもらう
     code = request.args.get('code', default = None, type = str)
-
-    #KeyError Bearerでエラー
-    oneTime = session["oneTime"]
+    oneTime = request.cookies.get('oneTime')
     print(oneTime)
-    if code is None:
+
+    if code == None or oneTime == None:
+        return render_template("404.html"),404
+    
+    soc = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+    soc.connect(("127.0.0.1",51994))
+    soc.send(bytes(("AUTH-"+oneTime),'utf8'))
+    recv = soc.recv(4096).decode()
+    soc.close()
+
+    if recv != "True":
         return render_template("404.html"),404
 
     data = {
