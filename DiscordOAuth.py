@@ -11,7 +11,10 @@ import string
 import base64
 from io import BytesIO
 import socket
-import datetime
+
+from datetime import timedelta
+
+from requests.sessions import Session
 #SSL関係はあぱっちパイセンに任せてるのでローカル環境ではcode 400 Bad Request
 
 #---config.json読み込み---
@@ -30,8 +33,8 @@ redirectURL = "https://discord.com/api/oauth2/authorize?client_id=67869420905798
 
 requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS += "HIGH:!DH:!aNULL"
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
 
+app.config['SECRET_KEY'] = os.urandom(24)
 #sslify = SSLify(app)
 
 basePath = os.path.dirname(__file__)
@@ -45,11 +48,17 @@ def Notfound(error):
 def InternalServerError(error):
     return render_template("500.html"),500
 
-#クッキーに保存→認証
+#sessionに保存→認証
 @app.route("/gen")
 def OneTimeURLGenerate():
+    session.permanent = True
+    app.permanent_session_lifetime = timedelta(minutes=10)
 
-    adminToken = request.cookies.get("token")
+    try:
+        adminToken = session["token"]
+    except KeyError:
+        adminToken = None
+
     code = request.args.get("code",default = None,type = str)
 
     soc = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
@@ -95,12 +104,12 @@ def OneTimeURLGenerate():
 
         userID = userInfo["id"]
         soc.send(bytes("ADMINGEN-"+userID,"utf-8"))
-        recv = list(soc.recv(4096).decode())
+        recv = soc.recv(4096).decode().split(",")
+        soc.close()
+        
         if recv[0] == "True":
-            response = redirect(url_for("OneTimeURLGenerate"))
-            max_age = 60 * 60 * 24 * 1 # 7 days
-            response.set_cookie('oneTime', value=recv[1],path="/",max_age=max_age, secure=False)
-            return response
+            session["token"] = recv[1]
+            return redirect(url_for("OneTimeURLGenerate"))
 
         else:
             return redirect("https://discord.com/api/oauth2/authorize?client_id=678694209057980467&redirect_uri=http%3A%2F%2Flocalhost%3A5000%2Fgen&response_type=code&scope=identify")
@@ -111,17 +120,16 @@ def OneTimeURLGenerate():
         soc.send(bytes("ADMINAUTH-"+adminToken,"utf-8"))
         recv = soc.recv(4096).decode()
         if recv == "False":
-            return redirect(url_for("OneTimeURLGenerate"))
+            return render_template("404.html"),404
+
     
     else:
-        return redirect()
+        return redirect("https://discord.com/api/oauth2/authorize?client_id=678694209057980467&redirect_uri=http%3A%2F%2Flocalhost%3A5000%2Fgen&response_type=code&scope=identify")
 
     oneTime = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
     accessURL = "http://localhost:5000/want?param="+oneTime
 
-    #soc = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-    soc.connect(("127.0.0.1",51994))
-    soc.send(bytes(("GEN-"+oneTime),'utf8'))
+    soc.send(bytes(("GEN-"+oneTime),'utf-8'))
     soc.close()
         
 
@@ -162,9 +170,13 @@ def AuthWait():
 @app.route("/OAuth")
 def OAuth():
     #リダイレクトでベアラートークンをもらう
+
+    session.permanent = True
+    app.permanent_session_lifetime = timedelta(minutes=10)
+    
     code = request.args.get('code', default = None, type = str)
     oneTime = request.cookies.get('oneTime')
-    print(oneTime)
+
 
     if code == None or oneTime == None:
         return render_template("404.html"),404
@@ -202,7 +214,6 @@ def OAuth():
 
     #所属サーバー一覧を取得(List内部にdict)
     userGuild :json = requests.get("https://discord.com/api/users/@me/guilds", headers=headers).json()
-    #print(userGuild)
 
     #トークン破棄用
     headers_token = {

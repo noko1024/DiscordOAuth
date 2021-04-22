@@ -20,8 +20,6 @@ try:
     while True:
         connection, address = soc.accept()
         recv = connection.recv(4096).decode()
-        print(oneTimeURL)
-        print(recv)
 
         if recv.startswith("GEN-"):
             oneTimeURL.append(recv.lstrip("GEN-"))
@@ -38,22 +36,22 @@ try:
                 connection.send(bytes("True","utf-8"))
 
         elif recv.startswith("ADMINAUTH-"):
-            if recv.lstrip("ADMINAUTH-") in adminToken:
+            if recv.lstrip("ADMINAUTH-") in adminToken.values():
                 connection.send(bytes("True","utf-8"))
+
             else:
-                connection.send("False","utf-8")
+                connection.send(bytes("False","utf-8"))
         
         elif recv.startswith("ADMINGEN-"):
             userID = int(recv.lstrip("ADMINGEN-"))
             if userID in adminToken:
                 adminToken[userID] = ''.join(random.choices(string.ascii_letters + string.digits, k=30))
-                connection.send(["True",adminToken[userID]],"utf-8")
-            else:
-                connection.send(["False"],"utf-8")
+                connection.send(bytes("True,"+adminToken[userID],"utf-8"))
 
-        print(oneTimeURL)
+            else:
+                connection.send(bytes("False,","utf-8"))
+
         connection.close()
 
 except KeyboardInterrupt:
-    print(oneTimeURL)
     soc.close()
