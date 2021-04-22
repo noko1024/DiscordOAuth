@@ -159,7 +159,7 @@ def AuthWait():
     if recv == "True":
         response = redirect(redirectURL)
         max_age = 60 * 60 * 24 * 1 # 1 days
-        response.set_cookie('oneTime', value=oneTime,path="/",max_age=max_age, secure=False)
+        response.set_cookie('oneTime', value=oneTime,path="/",max_age=max_age, secure=True)
         return response
 
     elif recv == "False":
