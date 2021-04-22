@@ -1,3 +1,4 @@
+from flask.helpers import get_flashed_messages, url_for
 from flask.wrappers import Response
 import requests
 from flask import Flask, json,request,make_response,jsonify,redirect,render_template,session
@@ -44,20 +45,81 @@ def Notfound(error):
 def InternalServerError(error):
     return render_template("500.html"),500
 
+#クッキーに保存→認証
 @app.route("/gen")
 def OneTimeURLGenerate():
-    
-    #QRコード発行者の認証方法考案
-    #OAuthは書きたくない
-    adminToken = request.cookies.get("token")
-    if adminToken == None:
-        pass
 
+    adminToken = request.cookies.get("token")
+    code = request.args.get("code",default = None,type = str)
+
+    soc = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+    soc.connect(("127.0.0.1",51994))
+
+    #OAuthリダイレクトのとき
+    if adminToken != None and code != None or code != None:
+        data = {
+            'client_id': ClientID,
+            'client_secret': ClientSecret,
+            'grant_type': 'authorization_code',
+            'code': code,
+            'redirect_uri': "http://localhost:5000/gen",
+            'scope': 'identify'
+            }
+        headers_token = {
+            'Content-Type':'application/x-www-form-urlencoded'
+            }
+    
+        #アクセストークンを取得(dict)
+        userAccessToken = requests.post('https://discord.com/api/v8/oauth2/token', data=data, headers=headers_token).json()
+        #ユーザーデータ取得用
+        headers = {
+            "Authorization": "Bearer %s" % userAccessToken["access_token"]
+            }
+    
+        #ユーザー情報を取得(dict)
+        userInfo = requests.get("https://discord.com/api/users/@me", headers=headers).json()
+
+        #トークン破棄用
+        headers_token = {
+            'Content-Type':'application/x-www-form-urlencoded',
+            "Authorization": "Bearer %s" % userAccessToken["access_token"]
+            }
+        data = {
+            'client_id': ClientID,
+            'client_secret': ClientSecret,
+            'token': userAccessToken["access_token"]
+            }
+    
+        #トークンを無効化
+        requests.post("https://discord.com/api/oauth2/token/revoke", headers=headers_token, data=data)
+
+        userID = userInfo["id"]
+        soc.send(bytes("ADMINGEN-"+userID,"utf-8"))
+        recv = list(soc.recv(4096).decode())
+        if recv[0] == "True":
+            response = redirect(url_for("OneTimeURLGenerate"))
+            max_age = 60 * 60 * 24 * 1 # 7 days
+            response.set_cookie('oneTime', value=recv[1],path="/",max_age=max_age, secure=False)
+            return response
+
+        else:
+            return redirect("https://discord.com/api/oauth2/authorize?client_id=678694209057980467&redirect_uri=http%3A%2F%2Flocalhost%3A5000%2Fgen&response_type=code&scope=identify")
+
+        
+    #Token発行済の場合
+    elif adminToken != None:
+        soc.send(bytes("ADMINAUTH-"+adminToken,"utf-8"))
+        recv = soc.recv(4096).decode()
+        if recv == "False":
+            return redirect(url_for("OneTimeURLGenerate"))
+    
+    else:
+        return redirect()
 
     oneTime = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
     accessURL = "http://localhost:5000/want?param="+oneTime
 
-    soc = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+    #soc = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
     soc.connect(("127.0.0.1",51994))
     soc.send(bytes(("GEN-"+oneTime),'utf8'))
     soc.close()
@@ -88,7 +150,7 @@ def AuthWait():
 
     if recv == "True":
         response = redirect(redirectURL)
-        max_age = 60 * 60 * 24 * 1 # 7 days
+        max_age = 60 * 60 * 24 * 1 # 1 days
         response.set_cookie('oneTime', value=oneTime,path="/",max_age=max_age, secure=False)
         return response
 

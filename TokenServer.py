@@ -1,5 +1,7 @@
 from os import stat_result
 import socket
+import string
+import random
 
 soc = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 soc.bind(("127.0.0.1", 51994))
@@ -34,7 +36,21 @@ try:
             if recv.lstrip("DEL-") in oneTimeURL:
                 oneTimeURL.remove(recv.lstrip("DEL-"))
                 connection.send(bytes("True","utf-8"))
-    
+
+        elif recv.startswith("ADMINAUTH-"):
+            if recv.lstrip("ADMINAUTH-") in adminToken:
+                connection.send(bytes("True","utf-8"))
+            else:
+                connection.send("False","utf-8")
+        
+        elif recv.startswith("ADMINGEN-"):
+            userID = int(recv.lstrip("ADMINGEN-"))
+            if userID in adminToken:
+                adminToken[userID] = ''.join(random.choices(string.ascii_letters + string.digits, k=30))
+                connection.send(["True",adminToken[userID]],"utf-8")
+            else:
+                connection.send(["False"],"utf-8")
+
         print(oneTimeURL)
         connection.close()
 
