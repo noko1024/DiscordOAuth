@@ -20,16 +20,17 @@ from requests.sessions import Session
 #---config.json読み込み---
 configPath = os.path.join(os.path.split(os.path.realpath(__file__))[0],"config")
 
-#with open(os.path.join(configPath,"HealthCheck-Config.json"))as d:
-#    f = d.read()
-#    data = json.loads(f)
+with open(os.path.join(configPath,"HealthCheck-Config.json"))as d:
+    f = d.read()
+    data = json.loads(f)
 
-ClientID = 678694209057980467
-ClientSecret = "JL5nbj6qCyO3j77R-eox7IHeXNly6msU"
-botToken = "Njc4Njk0MjA5MDU3OTgwNDY3.XkmhPA.hiCytsZowRx3sm59Al2AazYR4MM"
-guildID = "830565829895782440"
-roleID = "830566515392249857"
-redirectURL = "https://discord.com/api/oauth2/authorize?client_id=678694209057980467&redirect_uri=http%3A%2F%2Flocalhost%3A5000%2FOAuth&response_type=code&scope=identify%20guilds"
+ClientID = data["CLIENT_ID"]
+ClientSecret = data["CLIENT_SECRET"]
+botToken = data["BOT_TOKEN"]
+guildID = data["GUILD_ID"]
+roleID = data["ROLE_ID"]
+redirectURL = data["REDIRECT_URL"]
+adminRedirectURL = data["ADMIN_REDIRECT_URL"]
 
 requests.packages.urllib3.util.ssl_.DEFAULT_CIPHERS += "HIGH:!DH:!aNULL"
 app = Flask(__name__)
@@ -71,7 +72,7 @@ def OneTimeURLGenerate():
             'client_secret': ClientSecret,
             'grant_type': 'authorization_code',
             'code': code,
-            'redirect_uri': "http://localhost:5000/gen",
+            'redirect_uri': "https://api.noko1024.net/gen",
             'scope': 'identify'
             }
         headers_token = {
@@ -112,7 +113,7 @@ def OneTimeURLGenerate():
             return redirect(url_for("OneTimeURLGenerate"))
 
         else:
-            return redirect("https://discord.com/api/oauth2/authorize?client_id=678694209057980467&redirect_uri=http%3A%2F%2Flocalhost%3A5000%2Fgen&response_type=code&scope=identify")
+            return redirect(adminRedirectURL)
 
         
     #Token発行済の場合
@@ -124,10 +125,10 @@ def OneTimeURLGenerate():
 
     
     else:
-        return redirect("https://discord.com/api/oauth2/authorize?client_id=678694209057980467&redirect_uri=http%3A%2F%2Flocalhost%3A5000%2Fgen&response_type=code&scope=identify")
+        return redirect(adminRedirectURL)
 
     oneTime = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
-    accessURL = "http://localhost:5000/want?param="+oneTime
+    accessURL = "http://api.noko1024.net/want?param="+oneTime
 
     soc.send(bytes(("GEN-"+oneTime),'utf-8'))
     soc.close()
@@ -195,7 +196,7 @@ def OAuth():
         'client_secret': ClientSecret,
         'grant_type': 'authorization_code',
         'code': code,
-        'redirect_uri': "http://localhost:5000/OAuth",
+        'redirect_uri': "https://api.noko1024.net/OAuth",
         'scope': 'identify guilds'
     }
     headers_token = {
