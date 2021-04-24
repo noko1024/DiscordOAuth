@@ -14,7 +14,7 @@ import socket
 
 from datetime import timedelta
 
-from requests.sessions import Session
+
 #SSL関係はあぱっちパイセンに任せてるのでローカル環境ではcode 400 Bad Request
 
 #---config.json読み込み---
@@ -45,10 +45,11 @@ basePath = os.path.dirname(__file__)
 def Notfound(error):
     return render_template("418.html"),418
 
-@app.errorhandler(500)
-def InternalServerError(error):
-    return render_template("500.html"),500
-
+#@app.errorhandler(500)
+#def InternalServerError(error):
+#    print(error)
+    #return render_template("500.html"),500
+#    return error
 #sessionに保存→認証
 @app.route("/gen")
 def OneTimeURLGenerate():
@@ -62,8 +63,6 @@ def OneTimeURLGenerate():
 
     code = request.args.get("code",default = None,type = str)
 
-    soc = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-    soc.connect(("127.0.0.1",51994))
 
     #OAuthリダイレクトのとき
     if adminToken != None and code != None or code != None:
@@ -103,6 +102,9 @@ def OneTimeURLGenerate():
         #トークンを無効化
         requests.post("https://discord.com/api/oauth2/token/revoke", headers=headers_token, data=data)
 
+        soc = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+        soc.connect(("127.0.0.1",51994))
+
         userID = userInfo["id"]
         soc.send(bytes("ADMINGEN-"+userID,"utf-8"))
         recv = soc.recv(4096).decode().split(",")
@@ -118,6 +120,8 @@ def OneTimeURLGenerate():
         
     #Token発行済の場合
     elif adminToken != None:
+        soc = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+        soc.connect(("127.0.0.1",51994))
         soc.send(bytes("ADMINAUTH-"+adminToken,"utf-8"))
         recv = soc.recv(4096).decode()
         if recv == "False":
@@ -129,7 +133,9 @@ def OneTimeURLGenerate():
 
     oneTime = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
     accessURL = "http://api.noko1024.net/want?param="+oneTime
-
+    
+    soc = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+    soc.connect(("127.0.0.1",51994))
     soc.send(bytes(("GEN-"+oneTime),'utf-8'))
     soc.close()
         
@@ -254,4 +260,4 @@ def OAuth():
         return render_template("500.html"),500
 
 if __name__ == "__main__":
-	app.run(debug=False)
+	app.run(debug=True)
