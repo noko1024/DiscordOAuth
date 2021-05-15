@@ -157,6 +157,9 @@ def AuthWait():
     session.permanent = True
     oneTime = request.args.get('param', default = None, type = str)
 
+    if oneTime == None:
+        return render_template("404.html"),404
+
     soc = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
     soc.connect(("127.0.0.1",51994))
     soc.send(bytes(("AUTH-"+oneTime),'utf8'))
@@ -246,6 +249,7 @@ def OAuth():
 
     #削除成功しているか？
     status = requests.delete("https://discord.com/api/guilds/"+guildID+"/members/"+userInfo["id"]+"/roles/"+roleID,headers=headers).status_code
+    
     if status == 204:
         soc = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
         soc.connect(("127.0.0.1",51994))
@@ -255,8 +259,10 @@ def OAuth():
         if recv == "True":
             return render_template("200.html"),200
         else:
+            print(recv)
             return render_template("500.html"),500
     else:
+        print(status)
         return render_template("500.html"),500
 
 if __name__ == "__main__":

@@ -18,6 +18,7 @@ adminToken = {
 
 try:
     while True:
+        print(oneTimeURL)
         connection, address = soc.accept()
         recv = connection.recv(4096).decode()
 
